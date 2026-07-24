@@ -43,11 +43,16 @@ export function createOptionOrders(unitRandom = secureUnit) {
 export function getOrderedOptions(question, optionOrders) {
   if (!question.options) return [];
   const order = optionOrders?.[question.id];
-  if (!order) return question.options;
+  if (!Array.isArray(order) || order.length === 0) return question.options;
   const byValue = new Map(
     question.options.map((option) => [option.value, option]),
   );
-  return order.map((value) => byValue.get(value)).filter(Boolean);
+  const ordered = order.map((value) => byValue.get(value)).filter(Boolean);
+  const orderedValues = new Set(ordered.map((option) => option.value));
+  const missing = question.options.filter(
+    (option) => !orderedValues.has(option.value),
+  );
+  return [...ordered, ...missing];
 }
 
 export function normaliseRecruitmentSource(value) {
@@ -119,10 +124,6 @@ export function shouldShowQuestion(question, answers) {
 
 export function getVisibleFlow(pathway, answers = {}) {
   if (pathway === "user") {
-    const age = answerValue(answers.u_age);
-    if (age && age !== "yes") {
-      return ["u_age", "u_ineligible"];
-    }
     return USER_FLOW.filter((id) => shouldShowQuestion(QUESTIONS[id], answers));
   }
 
