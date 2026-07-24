@@ -1196,9 +1196,7 @@ export const QUESTIONS = {
 };
 
 export const USER_FLOW = [
-  "u_intro",
   "u_age",
-  "u_consent",
   "u1",
   "u3",
   "user_message",
@@ -1219,8 +1217,6 @@ export const USER_FLOW = [
 ];
 
 export const PRACTITIONER_FLOW = [
-  "t_intro",
-  "t_consent",
   "t_status",
   "t_experience",
   "t_setting",
