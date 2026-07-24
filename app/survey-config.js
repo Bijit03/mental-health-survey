@@ -1196,7 +1196,6 @@ export const QUESTIONS = {
 };
 
 export const USER_FLOW = [
-  "u_age",
   "u1",
   "u3",
   "user_message",
