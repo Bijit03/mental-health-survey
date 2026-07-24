@@ -35,6 +35,7 @@ const STORAGE_KEY = "mental_health_survey_draft_v1";
 type View =
   | "loading"
   | "resume"
+  | "consent"
   | "arrival"
   | "survey"
   | "exit"
@@ -806,6 +807,7 @@ export default function Home() {
   const [survey, setSurvey] = useState<SurveyState | null>(null);
   const [savedDraft, setSavedDraft] = useState<SurveyState | null>(null);
   const [selectedRole, setSelectedRole] = useState<string>("");
+  const [consentChecked, setConsentChecked] = useState(false);
   const [draftAnswer, setDraftAnswer] = useState<any>("");
   const [error, setError] = useState<string | null>(null);
   const [confirmReset, setConfirmReset] = useState(false);
@@ -832,7 +834,7 @@ export default function Home() {
       localStorage.removeItem(STORAGE_KEY);
     }
     setSurvey(fresh);
-    setView("arrival");
+    setView("consent");
   }, []);
 
   useEffect(() => {
@@ -898,8 +900,32 @@ export default function Home() {
     setSurvey(fresh);
     setSavedDraft(null);
     setSelectedRole("");
+    setConsentChecked(false);
     setConfirmReset(false);
+    setView("consent");
+  }
+
+  function beginConsent(event: FormEvent) {
+    event.preventDefault();
+    if (!consentChecked) {
+      setError(
+        "Choose the agreement checkbox to take part, or select “I do not want to take part”.",
+      );
+      return;
+    }
+    setSurvey({ ...survey!, consent: true });
+    setError(null);
     setView("arrival");
+  }
+
+  function declineConsent() {
+    localStorage.removeItem(STORAGE_KEY);
+    setSurvey(freshState());
+    setSavedDraft(null);
+    setConsentChecked(false);
+    setExitCleared(true);
+    setError(null);
+    setView("exit");
   }
 
   function resumeDraft() {
@@ -922,9 +948,10 @@ export default function Home() {
       return;
     }
     const next = {
-      ...freshState(),
+      ...survey,
       respondent_path: selectedRole,
-      current_id: selectedRole === "user" ? "u_intro" : "t_intro",
+      consent: true,
+      current_id: selectedRole === "user" ? "u_age" : "t_status",
     } as SurveyState;
     persistDraft(next);
     setView("survey");
@@ -1141,7 +1168,8 @@ export default function Home() {
               className="secondary-button"
               onClick={() => {
                 setSelectedRole("");
-                setView("arrival");
+                setConsentChecked(false);
+                setView("consent");
               }}
             >
               Start a new test
@@ -1184,7 +1212,8 @@ export default function Home() {
                 setCompletedPayload(null);
                 setSurvey(freshState());
                 setSelectedRole("");
-                setView("arrival");
+                setConsentChecked(false);
+                setView("consent");
               }}
             >
               Start another test
@@ -1194,6 +1223,97 @@ export default function Home() {
             No contact form is connected. If one is added later, it must remain
             separate and unlinked from survey answers.
           </p>
+        </section>
+      </main>
+    );
+  }
+
+  if (view === "consent") {
+    return (
+      <main className="page-shell arrival-shell">
+        <Header />
+        <section className="arrival-page">
+          <p className="screen-eyebrow">Before the survey</p>
+          <h1 className="arrival-title">Do you choose to take part?</h1>
+          <p className="arrival-copy">
+            You are invited to take part in an anonymous research survey about
+            a possible counselling or psychotherapy service and possible paid
+            opportunities for mental-health practitioners.
+          </p>
+          <div className="reading-copy">
+            <p>
+              <strong>What you will do:</strong> You will choose the survey
+              journey that applies to you and answer questions about the
+              proposed service or platform. You may skip only questions marked
+              optional.
+            </p>
+            <p>
+              <strong>Your choice:</strong> Taking part is voluntary. You may
+              stop at any time before submitting. Leaving the survey will not
+              submit a response, and choosing not to take part will have no
+              negative consequence.
+            </p>
+            <p>
+              <strong>Privacy:</strong> We do not ask for your name, contact
+              details, employer or clinic. Unfinished answers are stored only
+              in this browser for up to 7 days. A response is sent only when
+              you finish and submit the survey.
+            </p>
+            <p>
+              <strong>Please know:</strong> Some questions concern counselling
+              or psychotherapy and may feel personal. This survey is not
+              therapy, diagnosis, clinical screening, emergency help,
+              recruitment or an offer of care or employment. There is no
+              payment or direct personal benefit for taking part.
+            </p>
+          </div>
+          <form noValidate onSubmit={beginConsent} className="role-form">
+            {error ? <ErrorSummary message={error} errorRef={errorRef} /> : null}
+            <fieldset
+              className={`question-fieldset ${error ? "has-error" : ""}`}
+              aria-describedby={error ? "entry-consent-error" : undefined}
+            >
+              <legend className="sr-only">Participation agreement</legend>
+              <div
+                className={`choice-block consent-block ${
+                  consentChecked ? "is-selected" : ""
+                }`}
+              >
+                <label className="choice-label">
+                  <input
+                    type="checkbox"
+                    checked={consentChecked}
+                    onChange={(event) => {
+                      setConsentChecked(event.target.checked);
+                      setError(null);
+                    }}
+                  />
+                  <ChoiceMark type="checkbox" />
+                  <span>
+                    I am 18 or older, I have read and understood the information
+                    above, and I freely agree to take part in this survey.
+                  </span>
+                </label>
+              </div>
+              {error ? (
+                <p className="field-error" id="entry-consent-error">
+                  {error}
+                </p>
+              ) : null}
+            </fieldset>
+            <div className="button-row">
+              <button className="primary-button" type="submit">
+                Continue
+              </button>
+              <button
+                className="secondary-button"
+                type="button"
+                onClick={declineConsent}
+              >
+                I do not want to take part
+              </button>
+            </div>
+          </form>
         </section>
       </main>
     );
