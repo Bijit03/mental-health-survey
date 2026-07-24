@@ -1,6 +1,50 @@
+import https from "node:https";
 import { NextResponse } from "next/server";
 
 export const runtime = "nodejs";
+
+// Posts JSON to a URL, following a single 302 redirect as POST (not GET).
+// node:https is used instead of fetch because the WHATWG fetch spec converts
+// POST→GET on 301/302, which drops the body before it reaches Apps Script.
+function httpsPost(url: string, body: string, timeoutMs = 12_000): Promise<Record<string, unknown> | null> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error("Apps Script request timed out")), timeoutMs);
+
+    function post(target: string) {
+      const u = new URL(target);
+      const req = https.request(
+        {
+          hostname: u.hostname,
+          path: u.pathname + u.search,
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Content-Length": Buffer.byteLength(body),
+          },
+        },
+        (res) => {
+          if (res.statusCode && res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
+            res.resume();
+            post(res.headers.location);
+            return;
+          }
+          let raw = "";
+          res.on("data", (chunk) => { raw += chunk; });
+          res.on("end", () => {
+            clearTimeout(timer);
+            try { resolve(JSON.parse(raw)); }
+            catch { resolve(null); }
+          });
+        },
+      );
+      req.on("error", (err) => { clearTimeout(timer); reject(err); });
+      req.write(body);
+      req.end();
+    }
+
+    post(url);
+  });
+}
 
 const MAX_BODY_BYTES = 250_000;
 const ALLOWED_PATHS = new Set(["user", "practitioner"]);
@@ -105,37 +149,13 @@ export async function POST(request: Request) {
       payload,
     });
 
-    // Apps Script exec URLs return a 302 redirect. The Fetch spec converts POST
-    // to GET when following 301/302, dropping the body. We follow manually so
-    // the POST body reaches doPost on the redirect target.
-    const redirectResponse = await fetch(appsScriptUrl, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: requestBody,
-      redirect: "manual",
-      signal: AbortSignal.timeout(12_000),
-    });
+    // Apps Script exec URLs return a 302 redirect. node:https lets us follow
+    // the redirect as a POST (preserving the body) rather than converting to GET.
+    const result = await httpsPost(appsScriptUrl, requestBody);
 
-    const targetUrl =
-      redirectResponse.status >= 300 && redirectResponse.status < 400
-        ? redirectResponse.headers.get("location")
-        : null;
-
-    const upstream = targetUrl
-      ? await fetch(targetUrl, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: requestBody,
-          signal: AbortSignal.timeout(12_000),
-        })
-      : redirectResponse;
-
-    const result = await upstream.json().catch(() => null);
-
-    if (!upstream.ok || !result?.ok) {
+    if (!result?.ok) {
       console.error("Apps Script rejected a survey submission.", {
-        status: upstream.status,
-        upstreamStatus: result?.status,
+        upstreamStatus: result?.status ?? "no-response",
       });
       return NextResponse.json(
         { ok: false, error: "The response could not be saved. Please try again." },
@@ -151,6 +171,7 @@ export async function POST(request: Request) {
   } catch (error) {
     console.error("Apps Script request failed.", {
       name: error instanceof Error ? error.name : "UnknownError",
+      message: error instanceof Error ? error.message : String(error),
     });
     return NextResponse.json(
       { ok: false, error: "The response could not be saved. Please try again." },
