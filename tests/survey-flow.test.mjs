@@ -24,28 +24,17 @@ import {
 } from "../app/survey-engine.js";
 
 test("routes the two respondent pathways independently", () => {
-  const user = getVisibleFlow("user", { u_age: "yes" });
+  const user = getVisibleFlow("user", {});
   const practitioner = getVisibleFlow("practitioner", {
     t_status: "current_independent",
   });
 
   assert.deepEqual(user.filter((id) => id.startsWith("t")), []);
   assert.deepEqual(practitioner.filter((id) => id.startsWith("u")), []);
-  assert.equal(user[0], "u_age");
+  assert.equal(user[0], "u1");
   assert.equal(practitioner[0], "t_status");
   assert.equal(user.includes("u_consent"), false);
   assert.equal(practitioner.includes("t_consent"), false);
-});
-
-test("routes ineligible adults to a close before assignment", () => {
-  assert.deepEqual(getVisibleFlow("user", { u_age: "no" }), [
-    "u_age",
-    "u_ineligible",
-  ]);
-  assert.deepEqual(
-    getVisibleFlow("user", { u_age: "prefer_not_to_say" }),
-    ["u_age", "u_ineligible"],
-  );
 });
 
 test("routes non-current practitioner categories to a separate close", () => {
@@ -349,4 +338,28 @@ test("submission adapter preserves the draft when the backend fails", async () =
   } finally {
     globalThis.fetch = originalFetch;
   }
+});
+
+test("user journey does not repeat age confirmation after entry consent", () => {
+  const flow = getVisibleFlow("user", {});
+  assert.equal(flow[0], "u1");
+  assert.equal(flow.includes("u_age"), false);
+  assert.equal(flow.includes("u_consent"), false);
+  assert.equal(flow.includes("u_ineligible"), false);
+});
+
+test("stale or partial option orders never hide response choices", () => {
+  const question = QUESTIONS.u_familiarity;
+  assert.deepEqual(
+    getOrderedOptions(question, { u_familiarity: [] }).map(
+      (option) => option.value,
+    ),
+    question.options.map((option) => option.value),
+  );
+  assert.deepEqual(
+    getOrderedOptions(question, { u_familiarity: ["yes"] }).map(
+      (option) => option.value,
+    ),
+    ["yes", "no", "not_sure", "prefer_not_to_say"],
+  );
 });
