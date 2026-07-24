@@ -100,16 +100,36 @@ export async function POST(request: Request) {
   }
 
   try {
-    const upstream = await fetch(appsScriptUrl, {
+    const requestBody = JSON.stringify({
+      secret: appsScriptSecret,
+      payload,
+    });
+
+    // Apps Script exec URLs return a 302 redirect. The Fetch spec converts POST
+    // to GET when following 301/302, dropping the body. We follow manually so
+    // the POST body reaches doPost on the redirect target.
+    const redirectResponse = await fetch(appsScriptUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        secret: appsScriptSecret,
-        payload,
-      }),
-      redirect: "follow",
+      body: requestBody,
+      redirect: "manual",
       signal: AbortSignal.timeout(12_000),
     });
+
+    const targetUrl =
+      redirectResponse.status >= 300 && redirectResponse.status < 400
+        ? redirectResponse.headers.get("location")
+        : null;
+
+    const upstream = targetUrl
+      ? await fetch(targetUrl, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: requestBody,
+          signal: AbortSignal.timeout(12_000),
+        })
+      : redirectResponse;
+
     const result = await upstream.json().catch(() => null);
 
     if (!upstream.ok || !result?.ok) {
