@@ -121,7 +121,7 @@ export function getVisibleFlow(pathway, answers = {}) {
   if (pathway === "user") {
     const age = answerValue(answers.u_age);
     if (age && age !== "yes") {
-      return ["u_intro", "u_age", "u_ineligible"];
+      return ["u_age", "u_ineligible"];
     }
     return USER_FLOW.filter((id) => shouldShowQuestion(QUESTIONS[id], answers));
   }
@@ -130,7 +130,7 @@ export function getVisibleFlow(pathway, answers = {}) {
     const status = answerValue(answers.t_status);
     const eligible = ["current_independent", "current_supervised"];
     if (status && !eligible.includes(status)) {
-      return ["t_intro", "t_consent", "t_status", "t_ineligible"];
+      return ["t_status", "t_ineligible"];
     }
     return PRACTITIONER_FLOW.filter((id) =>
       shouldShowQuestion(QUESTIONS[id], answers),
