@@ -931,6 +931,13 @@ export default function Home() {
   function resumeDraft() {
     if (!savedDraft) return;
     let resumed = savedDraft;
+    if (
+      resumed.respondent_path === "user" &&
+      ["u_age", "u_consent", "u_ineligible"].includes(resumed.current_id)
+    ) {
+      resumed = { ...resumed, current_id: "u1" };
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(resumed));
+    }
     const question = QUESTIONS[resumed.current_id] as Question | undefined;
     if (question?.type === "concept" && !resumed.assigned_arm) {
       resumed = { ...resumed, assigned_arm: assignArm() };
@@ -951,7 +958,7 @@ export default function Home() {
       ...survey,
       respondent_path: selectedRole,
       consent: true,
-      current_id: selectedRole === "user" ? "u_age" : "t_status",
+      current_id: selectedRole === "user" ? "u1" : "t_status",
     } as SurveyState;
     persistDraft(next);
     setView("survey");
