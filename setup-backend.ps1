@@ -2,8 +2,14 @@ $ErrorActionPreference = "Stop"
 
 $appsScriptUrl = "https://script.google.com/macros/s/AKfycbzDC-9cPiqoXtuCxsMTce1yZyUxrxy1Z3EAFyfPpbXY1NIxn8FEMYGxEqLEL_1rs_Tk_A/exec"
 $secretBytes = New-Object byte[] 48
-[System.Security.Cryptography.RandomNumberGenerator]::Fill($secretBytes)
-$secret = [Convert]::ToHexString($secretBytes).ToLowerInvariant()
+$randomNumberGenerator = [System.Security.Cryptography.RandomNumberGenerator]::Create()
+try {
+  $randomNumberGenerator.GetBytes($secretBytes)
+}
+finally {
+  $randomNumberGenerator.Dispose()
+}
+$secret = ([BitConverter]::ToString($secretBytes) -replace "-", "").ToLowerInvariant()
 
 $body = @{
   provision = $true
