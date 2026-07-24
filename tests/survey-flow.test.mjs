@@ -31,19 +31,20 @@ test("routes the two respondent pathways independently", () => {
 
   assert.deepEqual(user.filter((id) => id.startsWith("t")), []);
   assert.deepEqual(practitioner.filter((id) => id.startsWith("u")), []);
-  assert.equal(user[0], "u_intro");
-  assert.equal(practitioner[0], "t_intro");
+  assert.equal(user[0], "u_age");
+  assert.equal(practitioner[0], "t_status");
+  assert.equal(user.includes("u_consent"), false);
+  assert.equal(practitioner.includes("t_consent"), false);
 });
 
 test("routes ineligible adults to a close before assignment", () => {
   assert.deepEqual(getVisibleFlow("user", { u_age: "no" }), [
-    "u_intro",
     "u_age",
     "u_ineligible",
   ]);
   assert.deepEqual(
     getVisibleFlow("user", { u_age: "prefer_not_to_say" }),
-    ["u_intro", "u_age", "u_ineligible"],
+    ["u_age", "u_ineligible"],
   );
 });
 
@@ -56,8 +57,6 @@ test("routes non-current practitioner categories to a separate close", () => {
     "prefer_not_to_say",
   ]) {
     assert.deepEqual(getVisibleFlow("practitioner", { t_status: status }), [
-      "t_intro",
-      "t_consent",
       "t_status",
       "t_ineligible",
     ]);
