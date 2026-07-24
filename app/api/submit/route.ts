@@ -3,12 +3,32 @@ import { NextResponse } from "next/server";
 
 export const runtime = "nodejs";
 
-// Posts JSON to a URL, following a single 302 redirect as POST (not GET).
-// node:https is used instead of fetch because the WHATWG fetch spec converts
-// POST→GET on 301/302, which drops the body before it reaches Apps Script.
+// Posts JSON to a URL. Apps Script exec URLs return a 302 redirect to a
+// googleusercontent.com echo URL that must be fetched via GET. node:https is
+// used so we can send the body to the first URL and then follow the redirect
+// as GET (WHATWG fetch with redirect:"follow" also converts POST→GET on 302,
+// but in environments where that conversion was unreliable we keep node:https).
 function httpsPost(url: string, body: string, timeoutMs = 12_000): Promise<Record<string, unknown> | null> {
   return new Promise((resolve, reject) => {
     const timer = setTimeout(() => reject(new Error("Apps Script request timed out")), timeoutMs);
+
+    function get(target: string) {
+      const u = new URL(target);
+      const req = https.request(
+        { hostname: u.hostname, path: u.pathname + u.search, method: "GET" },
+        (res) => {
+          let raw = "";
+          res.on("data", (chunk) => { raw += chunk; });
+          res.on("end", () => {
+            clearTimeout(timer);
+            try { resolve(JSON.parse(raw)); }
+            catch { resolve(null); }
+          });
+        },
+      );
+      req.on("error", (err) => { clearTimeout(timer); reject(err); });
+      req.end();
+    }
 
     function post(target: string) {
       const u = new URL(target);
@@ -25,7 +45,7 @@ function httpsPost(url: string, body: string, timeoutMs = 12_000): Promise<Recor
         (res) => {
           if (res.statusCode && res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
             res.resume();
-            post(res.headers.location);
+            get(res.headers.location);
             return;
           }
           let raw = "";
